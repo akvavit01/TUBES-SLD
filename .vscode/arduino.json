@@ -1,5 +1,0 @@
-{
-    "sketch": "main.ino",
-    "board": "stm32duino:STM32F1:genericSTM32F103C6",
-    "configuration": "upload_method=DFUUploadMethod,cpu_speed=speed_72mhz,opt=osstd"
-}
