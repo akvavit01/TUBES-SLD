@@ -205,11 +205,18 @@ void loop()
         Serial.println("Failsafe initiated!!!");
         Serial.println("Halting all processes!!!");
 
+        // Changing machine state to idling
         machineState = IDLING;
+    }
 
+    else if (machineState == IDLING)
+    {
         vacuumLid.off(); // Opening vacuum lid
         steamInput.off(); // Closing steam input valve
         steamOutput.on(); // Opening steam output valve
+
+        // Sterilizing chamber is now not vacuum
+        vacuumState = NOT_VACUUM;
     }
 
     else if (machineState == STERILIZING)
@@ -232,7 +239,7 @@ void loop()
 
                 steamOutput.off(); // Closing output valve
 
-                vacuumState = VACUUM;
+                vacuumState = VACUUM; // Sterilizing chamber is now vacuum
                 sterilizingStage = STEAM_INTAKING; // Changing sterilizing stage
             }
         }
@@ -247,6 +254,7 @@ void loop()
                     Serial.println("Minimal temperature and pressure for killing reached!!!");
                     Serial.println("Now : killing time!!! 屮(☼Д☼)屮");
 
+                    // Changing state
                     sterilizingStage = CONSTANT_TEMPERATURE_AND_PRESSURE;
                 }
                 else
@@ -297,6 +305,7 @@ void loop()
                     Serial.println("Killing finished!!!");
                     Serial.println("Now : letting steam out");
 
+                    // Changing state
                     sterilizingStage = STEAM_EXHAUSTING;
                 }
             }
@@ -322,6 +331,7 @@ void loop()
                     // Opening vacuum lid
                     vacuumLid.off();
 
+                    // Changing machine state
                     machineState = IDLING;
                 }
             }
@@ -343,6 +353,7 @@ void loop()
 boolean isVacuum()
 {
     // Checking if sterilization chamber is vacuum or not
+    // Checking is done based on preset time
     if (timeElapsed >= VACUUMING_TIME)
     {
         timeElapsed = 0;
@@ -359,6 +370,7 @@ boolean isVacuum()
 boolean killingFinished()
 {
     // Checking if sterilization process is finished or not
+    // Checking is done based on preset time
     if (timeElapsed >= KILLING_TIME)
     {
         timeElapsed = 0;

@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/home/leochen/.arduino15/packages/stm32duino/tools/**",
+                "/home/leochen/.arduino15/packages/stm32duino/hardware/STM32F1/2020.3.13/**",
+                "/home/leochen/.arduino15/packages/STM32/tools/**",
+                "/home/leochen/.arduino15/packages/STM32/hardware/stm32/1.8.0/**",
+                "/home/leochen/.arduino15/packages/stm32duino/hardware/STM32F1/2020.4.18/**"
+            ],
+            "forcedInclude": [],
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
