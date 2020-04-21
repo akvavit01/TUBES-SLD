@@ -19,152 +19,34 @@
 #include <Arduino.h>
 
 // Constants declaration
-#define BAUD_RATE 115200 // Value of baud rate
-#define VACUUMING_TIME 30000 // 5 minutes
-#define KILLING_TIME 900000 // 15 minutes
-#define DELAY_TIME 1000 // 1 second
+#define BAUD_RATE       115200 // Value of baud rate
+#define VACUUMING_TIME  30000 // 5 minutes
+#define KILLING_TIME    900000 // 15 minutes
+#define DELAY_TIME      1000 // 1 second
 // Remember, input from every sensor is measured in bits and returned as milivolts
 // To be edited with values gained from calibration
-#define MAX_PRESSURE 3000
-#define MIN_KILLING_PRESSURE 1500 
+#define MAX_PRESSURE            3000
+#define MIN_KILLING_PRESSURE    1500 
 #define MIN_KILLING_TEMPERATURE 1500
-#define SAFE_MAX_PRESSURE 500
-#define SAFE_MAX_TEMPERATURE 500
+#define SAFE_MAX_PRESSURE       500
+#define SAFE_MAX_TEMPERATURE    500
+#define REFERENCE_VOLTAGE       3300
+#define ADC_RESOLUTION          4096
+// For setting button type
+#define PULLDOWN    0
+#define PULLUP      1
+// For defining solenoid valve type
+#define NORMALLY_OPEN    1
+#define NORMALLY_CLOSED  0
 
 // Pin mapping
-#define PRESSURE_SENSOR_INPUT_PIN PA0 // Pin for reading pressure sensor data
-#define TEMPERATURE_SENSOR_INPUT_PIN PA1 // Pin for reading temperature sensor data
-#define STEAM_INPUT_VALVE PA2 // Pin for controlling input steam
-#define STEAM_OUTPUT_VALVE PA3 // Pin for controlling output steam
-#define VACUUM_LID PA4 // Pin for controlling autoclave machine lock
-#define ON_BUTTON PA5 // Pin for reading ON button input
-#define FAILSAFE_BUTTON PA6 // Pin for reading failsafe button
-
-// Class definitions
-class AnalogSensor
-{
-    private :
-        byte pin{};
-
-    public :
-        AnalogSensor(byte pin)
-        {
-            this->pin = pin;
-            init();
-        }
-
-        void init()
-        {
-            pinMode(pin, INPUT);
-        }
-
-        unsigned long read() // returns voltage in milivolts
-        {
-            const unsigned long ADCValue {analogRead(pin) };
-            const unsigned long refVoltage {3300};
-            const unsigned long ADCResolution {4096};
-
-            const unsigned long result {ADCValue * refVoltage / ADCResolution};
-
-            return result;
-        }
-};
-
-class Button // It is assumed that every button used is the pulldown variant
-{
-    private :
-        byte pin{};
-        byte state{};
-        boolean previousReading{};
-
-    public :
-        Button(byte pin)
-        {
-            this->pin = pin;
-            previousReading = LOW;
-            init();
-        }
-
-        void init()
-        {
-            pinMode(pin, INPUT);
-        }
-
-        boolean isPressed()
-        {
-            boolean newReading{digitalRead(pin) };
-            
-            if (previousReading==LOW && newReading==HIGH)
-            {
-                previousReading = HIGH;
-                return true;
-            }
-            else
-            {
-                previousReading = newReading;
-                return false;
-            }
-        }
-};
-
-class Actuator
-{
-    private :
-        byte pin{};
-
-    public :
-        Actuator(byte pin)
-        {
-            this->pin = pin;
-            init();
-        }
-
-        void init()
-        {
-            pinMode(pin, OUTPUT);
-            off();
-        }
-
-        void on()
-        {
-            digitalWrite(pin, HIGH);
-        }
-
-        void off()
-        {
-            digitalWrite(pin, LOW);
-        }
-};
-
-// Actuator and sensors initialization
-// Initialize pressure sensor
-AnalogSensor pressureSensor(PRESSURE_SENSOR_INPUT_PIN);
-
-// Initialize temperature sensor
-AnalogSensor temperatureSensor(TEMPERATURE_SENSOR_INPUT_PIN);
-
-// on() member function assumed to open both valves
-// Initialize steam input valve
-Actuator steamInput(STEAM_INPUT_VALVE);
-
-// Initialize steam output valve
-Actuator steamOutput(STEAM_OUTPUT_VALVE);
-
-// Initialize vacuum lid
-// on() member function assumed to seal the vacuum lid
-Actuator vacuumLid(VACUUM_LID);   
-
-// Initialize ON button
-Button ONButton(ON_BUTTON);
-
-// Initialize failsafe button
-Button failsafeButton(FAILSAFE_BUTTON);
-
-void setup()
-{
-	// Initialize serial monitor
-    Serial.begin(BAUD_RATE); 
-}
+#define PRESSURE_SENSOR_INPUT_PIN       PA0 // Pin for reading pressure sensor data
+#define TEMPERATURE_SENSOR_INPUT_PIN    PA1 // Pin for reading temperature sensor data
+#define STEAM_INPUT_VALVE               PA2 // Pin for controlling input steam
+#define STEAM_OUTPUT_VALVE              PA3 // Pin for controlling output steam
+#define VACUUM_LID                      PA4 // Pin for controlling autoclave machine lock
+#define ON_BUTTON                       PA5 // Pin for reading ON button input
+#define FAILSAFE_BUTTON                 PA6 // Pin for reading failsafe button
 
 // Global variables declaration
 enum MachineState
@@ -191,6 +73,165 @@ SterilizingStage sterilizingStage{};
 
 unsigned long timeElapsed{0};
 
+// Class definitions
+class AnalogSensor
+{
+    private :
+        byte pin{};
+
+    public :
+        AnalogSensor(byte pin)
+        {
+            this->pin = pin;
+            init();
+        }
+
+        void init()
+        {
+            pinMode(pin, INPUT_ANALOG);
+        }
+
+        unsigned long read() // returns voltage in milivolts
+        {
+            const unsigned int ADCValue {analogRead(pin) };
+
+            return (ulong)(ADCValue * REFERENCE_VOLTAGE / ADC_RESOLUTION);
+        }
+};
+
+class Button
+{
+    private :
+        byte pin{};
+        byte state{};
+        boolean previousReading{};
+        boolean variant{};
+
+    public :
+        Button(byte pin, boolean variant)
+        {
+            this->pin = pin;
+            this->variant = variant;
+
+            previousReading = LOW;
+
+            init();
+        }
+
+        void init()
+        {
+            if (variant == PULLDOWN)
+            {
+                pinMode(pin, INPUT);
+            }
+            else
+            {
+                pinMode(pin, INPUT_PULLUP);
+            }
+        }
+
+        boolean isPressed()
+        {
+            boolean newReading{digitalRead(pin) };
+            
+            // Checking button is pressed or not
+            if (variant == PULLDOWN)
+            {
+                if (previousReading==LOW && newReading==HIGH)
+                {
+                    previousReading = HIGH;
+                    return true;
+                }
+            }
+            else
+            {
+                if (previousReading==HIGH && newReading==LOW)
+                {
+                    previousReading = LOW;
+                    return true;
+                }
+            }
+
+            // If button is not pressed
+            previousReading = newReading;
+            return false;
+        }
+};
+
+class SolenoidValve
+{
+    private :
+        byte pin{};
+        boolean variant{};
+
+    public :
+        SolenoidValve(byte pin, boolean variant)
+        {
+            this->pin = pin;
+            this->variant = variant;
+
+            init();
+        }
+
+        void init()
+        {
+            pinMode(pin, OUTPUT);
+            close();
+        }
+
+        void open()
+        {
+            if (variant == NORMALLY_CLOSED)
+            {
+                digitalWrite(pin, HIGH);
+            }
+            else
+            {
+                digitalWrite(pin, LOW);
+            }
+        }
+
+        void close()
+        {
+            if (variant == NORMALLY_OPEN)
+            {
+                digitalWrite(pin, HIGH);
+            }
+            else
+            {
+                digitalWrite(pin, LOW);
+            }
+        }
+};
+
+// Actuator and sensors initialization
+// Initialize pressure sensor
+AnalogSensor pressureSensor(PRESSURE_SENSOR_INPUT_PIN);
+
+// Initialize temperature sensor
+AnalogSensor temperatureSensor(TEMPERATURE_SENSOR_INPUT_PIN);
+
+// Initialize steam input valve
+SolenoidValve steamInput(STEAM_INPUT_VALVE, NORMALLY_CLOSED);
+
+// Initialize steam output valve
+SolenoidValve steamOutput(STEAM_OUTPUT_VALVE, NORMALLY_CLOSED);
+
+// Initialize vacuum lid
+SolenoidValve vacuumLid(VACUUM_LID, NORMALLY_OPEN);   
+
+// Initialize ON button
+Button ONButton(ON_BUTTON, PULLDOWN);
+
+// Initialize failsafe button
+Button failsafeButton(FAILSAFE_BUTTON, PULLDOWN);
+
+void setup()
+{
+	// Initialize serial monitor
+    Serial.begin(BAUD_RATE); 
+}
+
 // Function prototype declaration
 boolean isVacuum();
 boolean killingFinished();
@@ -211,9 +252,9 @@ void loop()
 
     else if (machineState == IDLING)
     {
-        vacuumLid.off(); // Opening vacuum lid
-        steamInput.off(); // Closing steam input valve
-        steamOutput.on(); // Opening steam output valve
+        vacuumLid.open(); // Opening vacuum lid
+        steamInput.close(); // Closing steam input valve
+        steamOutput.open(); // Opening steam output valve
 
         // Sterilizing chamber is now not vacuum
         vacuumState = NOT_VACUUM;
@@ -228,8 +269,8 @@ void loop()
             Serial.println("Now : vacuuming");
 
             // Removing air from sterilization chamber
-            steamOutput.on(); // Opening output valve
-            steamInput.on(); // Opening input valve
+            steamOutput.open(); // Opening output valve
+            steamInput.open(); // Opening input valve
 
             // Checking if the chamber is already vacuum or not
             if (isVacuum() )
@@ -237,7 +278,7 @@ void loop()
                 // Reporting condition via serial monitor
                 Serial.println("Sterilization chamber is now vacuum");
 
-                steamOutput.off(); // Closing output valve
+                steamOutput.close(); // Closing output valve
 
                 vacuumState = VACUUM; // Sterilizing chamber is now vacuum
                 sterilizingStage = STEAM_INTAKING; // Changing sterilizing stage
@@ -264,7 +305,7 @@ void loop()
                     Serial.println("Now : reducing pressure");                    
 
                     // Letting steam out to prevent explosion
-                    steamOutput.on(); // Letting steam out   
+                    steamOutput.open(); // Letting steam out   
                 }
             }
 
@@ -281,8 +322,8 @@ void loop()
                     Serial.println("Temperature or pressure too low!!!");
                     Serial.println("Now : raising temperature and pressure");
 
-                    steamInput.on(); // Opening steam input valve
-                    steamOutput.off(); // Closing steam output valve
+                    steamInput.open(); // Opening steam input valve
+                    steamOutput.close(); // Closing steam output valve
                 }
                 else if (pressureSensor.read() >= MAX_PRESSURE)
                 {
@@ -290,13 +331,13 @@ void loop()
                     Serial.println("Pressure too high!!!");
                     Serial.println("Now : lowering pressure");
 
-                    steamInput.off(); // Closing steam input valve
-                    steamOutput.on(); // Opening steam output valve
+                    steamInput.close(); // Closing steam input valve
+                    steamOutput.open(); // Opening steam output valve
                 }
                 else
                 {
-                    steamInput.off(); // Closing steam input valve
-                    steamOutput.off(); // Closing steam output valve
+                    steamInput.close(); // Closing steam input valve
+                    steamOutput.close(); // Closing steam output valve
                 }
 
                 if (killingFinished() )
@@ -316,8 +357,8 @@ void loop()
                 Serial.println("Now : steam exhausting");
                 
                 // Letting steam out
-                steamOutput.on(); // Opening steam output valve
-                steamInput.off(); // Closing steam input valve
+                steamOutput.open(); // Opening steam output valve
+                steamInput.close(); // Closing steam input valve
 
                 if (pressureSensor.read() <= SAFE_MAX_PRESSURE && temperatureSensor.read() <= SAFE_MAX_TEMPERATURE)
                 {
@@ -325,11 +366,11 @@ void loop()
                     Serial.println("Opening vacuum lid");
 
                     // Closing all valves
-                    steamInput.off();
-                    steamOutput.off();
+                    steamInput.close();
+                    steamOutput.close();
 
                     // Opening vacuum lid
-                    vacuumLid.off();
+                    vacuumLid.open();
 
                     // Changing machine state
                     machineState = IDLING;
@@ -342,7 +383,7 @@ void loop()
     else if (ONButton.isPressed() )
     {
         machineState = STERILIZING;
-        vacuumLid.on(); // Closing vacuum lid
+        vacuumLid.close(); // Closing vacuum lid
     }
 
     // Making everything slower
